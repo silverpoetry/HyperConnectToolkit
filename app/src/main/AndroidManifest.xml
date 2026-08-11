@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Present on HyperOS system builds. It enables a direct launch when the ROM grants it;
+         HiddenSettingsLauncher safely falls back to one fixed root command otherwise. -->
+    <uses-permission
+        android:name="miui.permission.USE_INTERNAL_GENERAL_API"
+        tools:ignore="ProtectedPermissions" />
+
+    <queries>
+        <package android:name="com.milink.service" />
+        <package android:name="com.xiaomi.mirror" />
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.HyperConnectToolkit"
+        android:usesCleartextTraffic="false">
+
+        <activity
+            android:name=".app.MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <receiver
+            android:name=".platform.HookStatusReceiver"
+            android:directBootAware="true"
+            android:exported="true"
+            android:permission="android.permission.MANAGE_ACTIVITY_TASKS">
+            <intent-filter>
+                <action android:name="com.weichao.hyperconnecttoolkit.action.HOOKS_ACTIVE" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>
