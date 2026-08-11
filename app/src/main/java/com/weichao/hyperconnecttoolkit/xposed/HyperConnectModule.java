@@ -7,14 +7,9 @@ import android.app.BroadcastOptions;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.hardware.display.VirtualDisplayConfig;
 import android.os.Bundle;
-import android.text.TextUtils;
 import android.util.Log;
-import android.view.Window;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 import com.weichao.hyperconnecttoolkit.BuildConfig;
@@ -36,19 +31,20 @@ public final class HyperConnectModule extends XposedModule {
 
     private static final String DISCOVER_CLASS =
             "com.xiaomi.dist.notification.discover.LyraDiscover";
-    private static final String SHARE_NOTIFICATION_HELPER_CLASS = "G3.g";
-    private static final String PHONE_SINK_MANAGER_CLASS = "com.xiaomi.mirror.sink.c";
+    private static final String CONTINUITY_SERVICE_NAME_CLASS =
+            "com.xiaomi.continuity.ServiceName";
+    private static final String CALL_PROVIDER_CLASS =
+            "com.xiaomi.mirror.provider.CallProvider";
     private static final String TABLET_SINK_ACTIVITY_CLASS = "com.xiaomi.mirror.sink.g";
-    private static final String SESSION_OPEN_COORDINATOR_CLASS = "j4.h";
-    private static final String REMOTE_TRUST_MANAGER_CLASS = "com.xiaomi.mirror.trust.u";
 
     private static final String HOOK_STATUS_ACTION =
             "com.weichao.hyperconnecttoolkit.action.HOOKS_ACTIVE";
 
     private boolean miLinkHookInstalled;
     private boolean mirrorNotificationHooksInstalled;
-    private boolean rotationHooksInstalled;
+    private boolean rotationHookInstalled;
     private boolean activationReported;
+    private final ThreadLocal<Integer> localDiscoveryCheckDepth = new ThreadLocal<>();
 
     @Override
     public void onPackageLoaded(PackageLoadedParam param) {
@@ -72,11 +68,11 @@ public final class HyperConnectModule extends XposedModule {
     public void onPackageReady(PackageReadyParam param) {
         if (!param.isFirstPackage()
                 || !MIRROR_PACKAGE.equals(param.getPackageName())
-                || rotationHooksInstalled) {
+                || rotationHookInstalled) {
             return;
         }
-        rotationHooksInstalled = true;
-        installRotationAndFrameRateHooks(param.getClassLoader());
+        rotationHookInstalled = true;
+        installRotationHook(param.getClassLoader());
     }
 
     private void markModuleAppProcessActive(ClassLoader appClassLoader) {
@@ -142,37 +138,68 @@ public final class HyperConnectModule extends XposedModule {
         }
     }
 
-    /** Allows only the local tablet to pass the cast-capability prerequisite for discovery. */
+    /**
+     * Bypasses only the local Cast bit read by notification discovery.
+     *
+     * <p>The same Cast predicate is also used later for remote phones, so returning true globally
+     * would weaken peer capability negotiation. A thread-confined scope around
+     * {@code isLocalServiceDataSupport} identifies its synchronous nested Cast check without
+     * reflecting MiLink's networking manager or constructing vendor device objects.</p>
+     */
     private void installMiLinkDiscoveryHook(ClassLoader classLoader) {
         try {
             Class<?> discoverClass = classLoader.loadClass(DISCOVER_CLASS);
+            Class<?> serviceNameClass = classLoader.loadClass(CONTINUITY_SERVICE_NAME_CLASS);
+
+            Method localServiceSupport = discoverClass.getDeclaredMethod(
+                    "isLocalServiceDataSupport",
+                    serviceNameClass);
+            localServiceSupport.setAccessible(true);
             Method castSupport = discoverClass.getDeclaredMethod(
                     "isCastServiceSupport", String.class);
             castSupport.setAccessible(true);
 
-            hook(castSupport).intercept(chain -> {
+            hook(localServiceSupport).intercept(chain -> {
+                enterLocalDiscoveryCheck();
                 try {
-                    String requestedDeviceId = (String) chain.getArg(0);
-                    String localDeviceId = getLocalDeviceId(
-                            discoverClass,
-                            chain.getThisObject());
-                    if (localDeviceId != null && localDeviceId.equals(requestedDeviceId)) {
-                        log(Log.INFO, TAG,
-                                "Notification discovery: bypassed local tablet cast capability");
-                        return Boolean.TRUE;
-                    }
-                } catch (Throwable error) {
-                    log(Log.WARN, TAG,
-                            "Notification discovery identity check failed; using stock result",
-                            error);
+                    return chain.proceed();
+                } finally {
+                    exitLocalDiscoveryCheck();
+                }
+            });
+
+            hook(castSupport).intercept(chain -> {
+                if (isLocalDiscoveryCheckActive()) {
+                    log(Log.INFO, TAG,
+                            "Notification discovery: bypassed the scoped local Cast prerequisite");
+                    return Boolean.TRUE;
                 }
                 return chain.proceed();
             });
 
-            log(Log.INFO, TAG, "Installed MiLink notification discovery hook");
+            log(Log.INFO, TAG, "Installed scoped MiLink notification discovery hooks");
         } catch (Throwable error) {
-            log(Log.ERROR, TAG, "MiLink notification discovery hook is incompatible", error);
+            log(Log.ERROR, TAG, "MiLink notification discovery hooks are incompatible", error);
         }
+    }
+
+    private void enterLocalDiscoveryCheck() {
+        Integer depth = localDiscoveryCheckDepth.get();
+        localDiscoveryCheckDepth.set(depth == null ? 1 : depth + 1);
+    }
+
+    private void exitLocalDiscoveryCheck() {
+        Integer depth = localDiscoveryCheckDepth.get();
+        if (depth == null || depth <= 1) {
+            localDiscoveryCheckDepth.remove();
+            return;
+        }
+        localDiscoveryCheckDepth.set(depth - 1);
+    }
+
+    private boolean isLocalDiscoveryCheckActive() {
+        Integer depth = localDiscoveryCheckDepth.get();
+        return depth != null && depth > 0;
     }
 
     private void installMirrorNotificationFlowHooks(ClassLoader classLoader) {
@@ -181,152 +208,66 @@ public final class HyperConnectModule extends XposedModule {
             return;
         }
 
-        installNotificationLaunchHook(classLoader);
-        installNotificationSessionEstablishmentHook(classLoader);
+        installNotificationProviderBridge(classLoader);
     }
 
-    /** Replays the stock launch call after the tablet-only guard in G3.g#v(Bundle). */
-    private void installNotificationLaunchHook(ClassLoader classLoader) {
+    /** Routes notification clicks through Xiaomi's complete pinned-app flow (reason 9). */
+    private void installNotificationProviderBridge(ClassLoader classLoader) {
         try {
-            Class<?> helperClass = classLoader.loadClass(SHARE_NOTIFICATION_HELPER_CLASS);
-            Method launchNotificationSink = helperClass.getDeclaredMethod("v", Bundle.class);
-            launchNotificationSink.setAccessible(true);
-
-            Class<?> sinkManagerClass = classLoader.loadClass(PHONE_SINK_MANAGER_CLASS);
-            Method getSinkManager = sinkManagerClass.getDeclaredMethod("l");
-            getSinkManager.setAccessible(true);
-            Method launch = sinkManagerClass.getDeclaredMethod(
-                    "L",
+            Class<?> providerClass = classLoader.loadClass(CALL_PROVIDER_CLASS);
+            Method call = providerClass.getDeclaredMethod(
+                    "call",
                     String.class,
-                    int.class,
                     String.class,
-                    boolean.class,
-                    boolean.class);
-            launch.setAccessible(true);
+                    Bundle.class);
+            call.setAccessible(true);
 
-            hook(launchNotificationSink).intercept(chain -> {
-                Bundle extras = (Bundle) chain.getArg(0);
-                if (extras == null) {
+            hook(call).intercept(chain -> {
+                String method = (String) chain.getArg(0);
+                if (!(chain.getArg(2) instanceof Bundle)) {
                     return chain.proceed();
                 }
+                Bundle extras = (Bundle) chain.getArg(2);
 
                 String deviceId = extras.getString("deviceId");
                 String packageName = extras.getString("package");
-                if (TextUtils.isEmpty(deviceId) || TextUtils.isEmpty(packageName)) {
+                if (!CompatibilityPolicy.shouldBridgeNotificationCall(
+                        method,
+                        deviceId,
+                        packageName)) {
                     return chain.proceed();
                 }
 
-                try {
-                    Object sinkManager = getSinkManager.invoke(null);
-                    launch.invoke(
-                            sinkManager,
-                            deviceId,
-                            CompatibilityPolicy.CROSS_DEVICE_NOTIFICATION_REASON,
-                            packageName,
-                            false,
-                            false);
-
-                    Bundle success = new Bundle();
-                    success.putInt("value", 0);
-                    log(Log.INFO, TAG, "Started notification-triggered tablet sub-screen");
-                    return success;
-                } catch (Throwable error) {
-                    log(Log.ERROR, TAG,
-                            "Notification sub-screen launch failed; falling back to stock behavior",
-                            unwrapInvocationTarget(error));
-                    return chain.proceed();
-                }
-            });
-
-            log(Log.INFO, TAG, "Installed notification sub-screen launch hook");
-        } catch (Throwable error) {
-            log(Log.ERROR, TAG, "Notification sub-screen launch hook is incompatible", error);
-        }
-    }
-
-    /**
-     * Corrects the notification session before its first transport message is sent.
-     *
-     * <p>Reason 17 reaches the generic tablet sink, whose stock policy sends a dimensionless
-     * {@code ScreenActionMessage}. The pinned-app path instead sends a
-     * {@code RequestAppScreenMessage} with the current window metrics. Reusing that stock branch
-     * here gives the source device the correct portrait dimensions at display creation time. The
-     * trust refresh is deliberately ordered before the open request, matching Xiaomi's phone
-     * mirror activities.</p>
-     */
-    private void installNotificationSessionEstablishmentHook(ClassLoader classLoader) {
-        try {
-            Class<?> coordinatorClass = classLoader.loadClass(SESSION_OPEN_COORDINATOR_CLASS);
-            Method openSession = coordinatorClass.getDeclaredMethod(
-                    "a",
-                    String.class,
-                    int.class,
-                    String.class,
-                    Window.class,
-                    boolean.class,
-                    boolean.class,
-                    Activity.class);
-            openSession.setAccessible(true);
-
-            Method getTrustManager = null;
-            Method refreshStatus = null;
-            try {
-                Class<?> trustManagerClass = classLoader.loadClass(REMOTE_TRUST_MANAGER_CLASS);
-                getTrustManager = trustManagerClass.getDeclaredMethod("A");
-                getTrustManager.setAccessible(true);
-                refreshStatus = trustManagerClass.getDeclaredMethod("m0", String.class);
-                refreshStatus.setAccessible(true);
-            } catch (Throwable error) {
-                log(Log.WARN, TAG,
-                        "Trust initialization is unavailable; initial-size policy remains active",
-                        error);
-            }
-            Method resolvedGetTrustManager = getTrustManager;
-            Method resolvedRefreshStatus = refreshStatus;
-
-            hook(openSession).intercept(chain -> {
-                int startReason = (int) chain.getArg(1);
-                if (!CompatibilityPolicy.isCrossDeviceNotificationSession(startReason)) {
-                    return chain.proceed();
-                }
-
-                String deviceId = (String) chain.getArg(0);
-                if (!TextUtils.isEmpty(deviceId)
-                        && resolvedGetTrustManager != null
-                        && resolvedRefreshStatus != null) {
-                    try {
-                        Object trustManager = resolvedGetTrustManager.invoke(null);
-                        resolvedRefreshStatus.invoke(trustManager, deviceId);
-                    } catch (Throwable error) {
-                        log(Log.ERROR, TAG,
-                                "Remote trust status initialization failed",
-                                unwrapInvocationTarget(error));
-                    }
-                }
+                Bundle pinAppExtras = new Bundle(extras);
+                pinAppExtras.putString("remoteDeviceId", deviceId);
 
                 Object[] args = chain.getArgs().toArray();
-                args[4] = CompatibilityPolicy.useAppScreenOpenRequest(
-                        (boolean) args[4],
-                        startReason);
-                args[5] = CompatibilityPolicy.forceLandscapeInitialBounds(
-                        (boolean) args[5],
-                        startReason);
+                args[0] = CompatibilityPolicy.PIN_APP_PROVIDER_METHOD;
+                args[2] = pinAppExtras;
+
+                // Invoke the provider exactly once. If Xiaomi's native PIN_APP path fails, let
+                // that failure propagate instead of replaying the original notification action
+                // after the first invocation may already have changed connection state.
+                Object stockResult = chain.proceed(args);
+
+                Bundle result = stockResult instanceof Bundle
+                        ? new Bundle((Bundle) stockResult)
+                        : new Bundle();
+                result.putInt("value", 0);
                 log(Log.INFO, TAG,
-                        "Notification session established with native window metrics and trust");
-                return chain.proceed(args);
+                        "Notification click routed through the stock PIN_APP flow");
+                return result;
             });
 
-            log(Log.INFO, TAG, "Installed notification session-establishment hook");
+            log(Log.INFO, TAG, "Installed notification provider bridge");
         } catch (Throwable error) {
-            log(Log.ERROR, TAG, "Notification session-establishment hook is incompatible", error);
+            log(Log.ERROR, TAG, "Notification provider bridge is incompatible", error);
         }
     }
 
-    private void installRotationAndFrameRateHooks(ClassLoader classLoader) {
+    private void installRotationHook(ClassLoader classLoader) {
         hookRequestedOrientation(classLoader);
-        hookVirtualDisplayRefreshRate();
-        hookStreamFrameRate(classLoader);
-        log(Log.INFO, TAG, "Installed scoped orientation and establishment-time 120 fps hooks");
+        log(Log.INFO, TAG, "Installed scoped orientation hook");
     }
 
     private void hookRequestedOrientation(ClassLoader classLoader) {
@@ -356,59 +297,6 @@ public final class HyperConnectModule extends XposedModule {
         }
     }
 
-    // Intentional: this code runs inside the privileged Mirror process through LSPosed and hooks
-    // the ROM's own builder. It is not invoked from the normal application process.
-    @SuppressLint("BlockedPrivateApi")
-    private void hookVirtualDisplayRefreshRate() {
-        try {
-            Method build = VirtualDisplayConfig.Builder.class.getDeclaredMethod("build");
-            hook(build).intercept(chain -> {
-                VirtualDisplayConfig.Builder builder =
-                        (VirtualDisplayConfig.Builder) chain.getThisObject();
-                builder.setRequestedRefreshRate(CompatibilityPolicy.TARGET_FPS);
-                return chain.proceed();
-            });
-        } catch (ReflectiveOperationException error) {
-            log(Log.ERROR, TAG, "Virtual-display refresh-rate hook is incompatible", error);
-        }
-    }
-
-    private void hookStreamFrameRate(ClassLoader classLoader) {
-        try {
-            Class<?> displayConfigBuilderClass = Class.forName(
-                    "r3.J$b",
-                    false,
-                    classLoader);
-            Method setFrameRate = displayConfigBuilderClass.getDeclaredMethod("h", int.class);
-            setFrameRate.setAccessible(true);
-            hook(setFrameRate).intercept(chain -> {
-                int stockFps = (int) chain.getArg(0);
-                int targetFps = CompatibilityPolicy.resolveFrameRate(stockFps);
-                return targetFps == stockFps
-                        ? chain.proceed()
-                        : chain.proceed(new Object[]{targetFps});
-            });
-
-            Class<?> codecConfigClass = Class.forName("t3.m", false, classLoader);
-            Method initializeEncoderLimits = codecConfigClass.getDeclaredMethod(
-                    "n",
-                    int.class,
-                    int.class);
-            initializeEncoderLimits.setAccessible(true);
-            hook(initializeEncoderLimits).intercept(chain -> {
-                int stockFps = (int) chain.getArg(0);
-                int targetFps = CompatibilityPolicy.resolveFrameRate(stockFps);
-                if (targetFps == stockFps) {
-                    return chain.proceed();
-                }
-                return chain.proceed(new Object[]{targetFps, chain.getArg(1)});
-            });
-            log(Log.INFO, TAG, "Installed display and encoder initialization frame-rate hooks");
-        } catch (ReflectiveOperationException error) {
-            log(Log.ERROR, TAG, "Stream frame-rate hook is incompatible", error);
-        }
-    }
-
     private boolean isTabletDevice(ClassLoader classLoader) {
         try {
             Class<?> miuiBuild = Class.forName("miui.os.Build", false, classLoader);
@@ -419,33 +307,4 @@ public final class HyperConnectModule extends XposedModule {
         }
     }
 
-    private static String getLocalDeviceId(
-            Class<?> discoverClass,
-            Object discoverInstance) throws ReflectiveOperationException {
-        Field managerField = discoverClass.getDeclaredField("mNetworkingManager");
-        managerField.setAccessible(true);
-        Object networkingManager = managerField.get(discoverInstance);
-        if (networkingManager == null) {
-            return null;
-        }
-
-        Method getLocalDeviceInfo = networkingManager.getClass()
-                .getMethod("getLocalDeviceInfo");
-        Object localDeviceInfo = getLocalDeviceInfo.invoke(networkingManager);
-        if (localDeviceInfo == null) {
-            return null;
-        }
-
-        Method getDeviceId = localDeviceInfo.getClass().getMethod("getDeviceId");
-        Object value = getDeviceId.invoke(localDeviceInfo);
-        return value instanceof String ? (String) value : null;
-    }
-
-    private static Throwable unwrapInvocationTarget(Throwable error) {
-        if (error instanceof InvocationTargetException
-                && ((InvocationTargetException) error).getCause() != null) {
-            return ((InvocationTargetException) error).getCause();
-        }
-        return error;
-    }
 }

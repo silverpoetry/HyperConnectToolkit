@@ -4,23 +4,24 @@ import android.content.pm.ActivityInfo;
 
 /** Pure compatibility decisions kept separate from ROM reflection and LSPosed plumbing. */
 final class CompatibilityPolicy {
-    static final int CROSS_DEVICE_NOTIFICATION_REASON = 17;
-    static final int STOCK_FPS = 60;
-    static final int TARGET_FPS = 120;
+    // CallProvider's public protocol name. Its downstream helper uses
+    // "launchNotificationSink" only as a log label, not as the provider method key.
+    static final String NOTIFICATION_CLICK_PROVIDER_METHOD =
+            "launchAppFromPendingIntentSink";
+    static final String PIN_APP_PROVIDER_METHOD = "performPinIconClick";
 
     private CompatibilityPolicy() {
     }
 
-    static boolean isCrossDeviceNotificationSession(int startReason) {
-        return startReason == CROSS_DEVICE_NOTIFICATION_REASON;
-    }
-
-    static boolean useAppScreenOpenRequest(boolean stockValue, int startReason) {
-        return stockValue || isCrossDeviceNotificationSession(startReason);
-    }
-
-    static boolean forceLandscapeInitialBounds(boolean stockValue, int startReason) {
-        return isCrossDeviceNotificationSession(startReason) ? false : stockValue;
+    static boolean shouldBridgeNotificationCall(
+            String providerMethod,
+            String deviceId,
+            String packageName) {
+        return NOTIFICATION_CLICK_PROVIDER_METHOD.equals(providerMethod)
+                && deviceId != null
+                && !deviceId.isEmpty()
+                && packageName != null
+                && !packageName.isEmpty();
     }
 
     static int resolveRequestedOrientation(boolean isTabletSink, int requestedOrientation) {
@@ -29,9 +30,5 @@ final class CompatibilityPolicy {
             return ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR;
         }
         return requestedOrientation;
-    }
-
-    static int resolveFrameRate(int stockFps) {
-        return stockFps == STOCK_FPS ? TARGET_FPS : stockFps;
     }
 }

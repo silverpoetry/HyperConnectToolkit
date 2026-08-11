@@ -4,13 +4,11 @@
 
 ## 功能
 
-- 跨设备通知：只对 MiLink 查询本机设备能力时绕过错误的平板 Cast 能力门槛，远端设备仍必须具备原生通知与串流能力。
-- 通知点击串流：复用 Mirror 原始参数和启动调用，绕过平板专属的 phone-only 提前返回。
-- 冷启动认证：在通知原因（`start_reason = 17`）的首个建链消息发出前初始化远端信任状态，保留原生密码/可信设备流程。
-- 竖屏内容修复：通知会话从第一条请求就使用原生应用屏协议携带当前窗口宽高；方向解锁仅作用于平板串流 Activity，不再依赖首帧后的延迟 resize 补丁。
-- 120 Hz：在虚拟显示、串流显示配置 Builder 和编码能力初始化阶段统一设置帧率，不篡改已建立对象的 getter。
+- 跨设备通知：仅在 MiLink 的本机发现前置检查作用域内放行错误的 Cast 能力位，远端设备仍执行原生能力协商。
+- 通知点击串流：在 Mirror 的稳定 Provider 边界把通知请求转入原生 `performPinIconClick`，完整复用普通应用流转的连接、认证和错误处理。
+- 竖屏内容修复：原生 `PIN_APP` 链路从第一条请求就携带当前窗口宽高；方向解锁仅作用于平板串流 Activity，不依赖首帧后的延迟 resize 补丁。
 - 隐藏设置入口：打开 `FeatureNotificationActivity`，即系统原本隐藏的“本机接收通知 / 同步本机通知”双标签页。
-- 环境诊断：显示由真实 Mirror 目标进程报告的模块加载状态、Root、MiLink、Mirror 及两个通知安全设置的状态。
+- 运行状态：显示由真实 Mirror 目标进程报告的模块加载状态，以及 Root、MiLink、Mirror 和两个通知安全设置的状态。
 
 ## 架构
 
@@ -36,7 +34,7 @@ HyperConnectModule (signature-constrained hooks)
 
 ## 构建
 
-要求 JDK 17+、Android SDK 36。仓库使用 Gradle 8.14.5、AGP 8.13.1、Kotlin 2.2.10 和 Compose BOM 2025.06.01。最低系统为 Android 14（API 34），与 `VirtualDisplayConfig.Builder` 的实际平台 API 下限一致。
+要求 JDK 17+、Android SDK 36。仓库使用 Gradle 8.14.5、AGP 8.13.1、Kotlin 2.2.10 和 Compose BOM 2025.06.01。最低系统为 Android 14（API 34）。
 
 ```powershell
 ./gradlew.bat :app:assembleDebug :app:testDebugUnitTest :app:lintDebug

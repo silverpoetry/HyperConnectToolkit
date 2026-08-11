@@ -8,20 +8,50 @@ import org.junit.Test
 
 class CompatibilityPolicyTest {
     @Test
-    fun `notification sessions use native app-screen request with current bounds`() {
-        val reason = CompatibilityPolicy.CROSS_DEVICE_NOTIFICATION_REASON
-
-        assertTrue(CompatibilityPolicy.isCrossDeviceNotificationSession(reason))
-        assertTrue(CompatibilityPolicy.useAppScreenOpenRequest(false, reason))
-        assertFalse(CompatibilityPolicy.forceLandscapeInitialBounds(true, reason))
+    fun `valid notification provider calls are bridged to the stock pin-app flow`() {
+        assertEquals(
+            "launchAppFromPendingIntentSink",
+            CompatibilityPolicy.NOTIFICATION_CLICK_PROVIDER_METHOD,
+        )
+        assertTrue(
+            CompatibilityPolicy.shouldBridgeNotificationCall(
+                CompatibilityPolicy.NOTIFICATION_CLICK_PROVIDER_METHOD,
+                "device-id",
+                "com.example.app",
+            ),
+        )
     }
 
     @Test
-    fun `unrelated sessions preserve stock request policy`() {
-        assertFalse(CompatibilityPolicy.isCrossDeviceNotificationSession(9))
-        assertFalse(CompatibilityPolicy.useAppScreenOpenRequest(false, 9))
-        assertTrue(CompatibilityPolicy.useAppScreenOpenRequest(true, 9))
-        assertTrue(CompatibilityPolicy.forceLandscapeInitialBounds(true, 9))
+    fun `provider bridge rejects unrelated or incomplete calls`() {
+        assertFalse(
+            CompatibilityPolicy.shouldBridgeNotificationCall(
+                "launchNotificationSink",
+                "device-id",
+                "com.example.app",
+            ),
+        )
+        assertFalse(
+            CompatibilityPolicy.shouldBridgeNotificationCall(
+                CompatibilityPolicy.PIN_APP_PROVIDER_METHOD,
+                "device-id",
+                "com.example.app",
+            ),
+        )
+        assertFalse(
+            CompatibilityPolicy.shouldBridgeNotificationCall(
+                CompatibilityPolicy.NOTIFICATION_CLICK_PROVIDER_METHOD,
+                "",
+                "com.example.app",
+            ),
+        )
+        assertFalse(
+            CompatibilityPolicy.shouldBridgeNotificationCall(
+                CompatibilityPolicy.NOTIFICATION_CLICK_PROVIDER_METHOD,
+                "device-id",
+                null,
+            ),
+        )
     }
 
     @Test
@@ -40,12 +70,5 @@ class CompatibilityPolicyTest {
                 ActivityInfo.SCREEN_ORIENTATION_PORTRAIT,
             ),
         )
-    }
-
-    @Test
-    fun `only stock sixty fps values are upgraded`() {
-        assertEquals(120, CompatibilityPolicy.resolveFrameRate(60))
-        assertEquals(30, CompatibilityPolicy.resolveFrameRate(30))
-        assertEquals(90, CompatibilityPolicy.resolveFrameRate(90))
     }
 }
