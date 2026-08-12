@@ -136,7 +136,6 @@ private fun HomeScreen(
                 }
                 item {
                     NotificationSettingsCard(
-                        environment = state.environment,
                         isBusy = state.isActionRunning,
                         onOpenNotificationSettings = onOpenNotificationSettings,
                         onRequestRestart = onRequestRestart,

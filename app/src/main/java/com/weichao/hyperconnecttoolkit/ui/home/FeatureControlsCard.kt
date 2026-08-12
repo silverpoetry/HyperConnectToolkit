@@ -43,7 +43,7 @@ internal fun FeatureControlsCard(
         FeatureSwitchRow(
             feature = Feature.CROSS_DEVICE_NOTIFICATION,
             icon = Icons.Rounded.NotificationsActive,
-            title = "跨设备通知",
+            title = "解锁跨设备通知流转",
             summary = "设备发现与通知点击串流",
             targetApplication = "MiLink Notification",
             checked = settings.crossDeviceNotification,
@@ -56,7 +56,7 @@ internal fun FeatureControlsCard(
         FeatureSwitchRow(
             feature = Feature.PORTRAIT_STREAMING,
             icon = Icons.Rounded.ScreenRotation,
-            title = "竖屏串流",
+            title = "允许平板竖屏流转应用",
             summary = "自由旋转与首包画面尺寸校正",
             targetApplication = "Xiaomi Mirror",
             checked = settings.portraitStreaming,
@@ -70,7 +70,7 @@ internal fun FeatureControlsCard(
             feature = Feature.MILINK_MULTI_CHANNEL,
             icon = Icons.Rounded.Devices,
             title = "MiLink Multi-Channel",
-            summary = "平板双通道与 Host 未绑定修复",
+            summary = "支持手机与多台平板建立流转，需在手机上开启此选项",
             targetApplication = "MiLink Core",
             checked = settings.miLinkMultiChannel,
             hookRuntime = hookRuntime,

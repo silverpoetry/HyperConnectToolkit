@@ -13,12 +13,6 @@ enum class RootCommand(val shellText: String) {
     ),
     STOP_MIRROR("am force-stop com.xiaomi.mirror"),
     STOP_MILINK("am force-stop com.milink.service"),
-    READ_NOTIFICATION_RECEIVE(
-        "settings get secure pref_key_connectivity_share_notification_local_state",
-    ),
-    READ_NOTIFICATION_SEND(
-        "settings get secure pref_key_connectivity_share_notification_mi_phone_state",
-    ),
 }
 
 data class RootResult(

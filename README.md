@@ -1,16 +1,16 @@
 # HyperConnect Toolkit
 
-面向 HyperOS 平板的单一 LSPosed 兼容模块与 Material 3 管理界面。项目合并了此前独立的“跨设备通知解锁”“妙享横竖屏修复”和“MiLink Multi-Channel”，并提供系统隐藏的“互联中心 → 跨设备通知”顶层页面入口。
+面向 HyperOS 平板的单一 LSPosed 兼容模块与 Material 3 管理界面。项目合并了解锁跨设备通知流转、允许平板竖屏流转应用和 MiLink Multi-Channel，并提供系统隐藏的“互联中心 → 跨设备通知”顶层页面入口。
 
 ## 功能
 
-- 跨设备通知：仅在 MiLink 的本机发现前置检查作用域内放行错误的 Cast 能力位，远端设备仍执行原生能力协商。
+- 解锁跨设备通知流转：仅在 MiLink 的本机发现前置检查作用域内放行错误的 Cast 能力位，远端设备仍执行原生能力协商。
 - 通知点击串流：在 MiLink 的通知点击工作线程把请求转入原生 `performPinIconClick`，并消费同一次点击自带的重复远端启动命令；串流只建立一条主动通道，完整复用普通应用流转的连接、认证和错误处理。
 - 竖屏内容修复：在稳定消息构造边界校正全屏模式错误交换的首包宽高，使原生 `PIN_APP` 请求与实际屏幕方向一致；后续旋转继续使用系统 resize 链路。
-- MiLink Multi-Channel：仅在 MiLink 核心进程把 AndroidPad 共享通道上限从 1 调整为 2，并只在原生检查返回 `HostNotBound (215)` 时补做官方绑定流程。
-- 独立开关：上述三个功能组均可单独关闭；新配置默认只启用跨设备通知，竖屏串流与 MiLink Multi-Channel 默认关闭。目标进程启动时读取一次配置，关闭的功能不会注册 Hook。
-- 隐藏设置入口：打开 `FeatureNotificationActivity`，即系统原本隐藏的“本机接收通知 / 同步本机通知”双标签页。
-- 运行状态：跨设备通知、竖屏串流和 Multi-Channel 分别显示对应 MiLink Notification、Xiaomi Mirror 与 MiLink Core 进程的实际 Hook 应用状态；另行显示 Root、MiLink、Mirror 和两个通知安全设置的状态。
+- MiLink Multi-Channel：支持手机与多台平板建立流转，需在手机上开启此选项。实现上仅在 MiLink 核心进程把 AndroidPad 共享通道上限从 1 调整为 2，并只在原生检查返回 `HostNotBound (215)` 时补做官方绑定流程。
+- 独立开关：上述三个功能组均可单独关闭；新配置默认只启用解锁跨设备通知流转，允许平板竖屏流转应用与 MiLink Multi-Channel 默认关闭。目标进程启动时读取一次配置，关闭的功能不会注册 Hook。
+- 隐藏设置入口：打开 `FeatureNotificationActivity`，即系统原本隐藏的跨设备流转设置页。
+- 运行状态：三个功能分别显示对应 MiLink Notification、Xiaomi Mirror 与 MiLink Core 进程的实际 Hook 应用状态；另行显示 Root、MiLink 和 Xiaomi Mirror 的环境状态。
 
 ## 架构
 

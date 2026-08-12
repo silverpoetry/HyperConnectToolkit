@@ -14,8 +14,6 @@ class RootCommandPolicyTest {
                 RootCommand.OPEN_CROSS_DEVICE_NOTIFICATION,
                 RootCommand.STOP_MIRROR,
                 RootCommand.STOP_MILINK,
-                RootCommand.READ_NOTIFICATION_RECEIVE,
-                RootCommand.READ_NOTIFICATION_SEND,
             ),
             RootCommand.entries.toSet(),
         )

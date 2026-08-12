@@ -31,11 +31,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.weichao.hyperconnecttoolkit.domain.model.EnvironmentSnapshot
-import com.weichao.hyperconnecttoolkit.domain.model.ToggleState
 
 @Composable
 internal fun NotificationSettingsCard(
-    environment: EnvironmentSnapshot?,
     isBusy: Boolean,
     onOpenNotificationSettings: () -> Unit,
     onRequestRestart: () -> Unit,
@@ -49,8 +47,9 @@ internal fun NotificationSettingsCard(
                     tint = MaterialTheme.colorScheme.primary,
                 )
             },
-            headlineContent = { Text("系统通知设置", fontWeight = FontWeight.SemiBold) },
-            supportingContent = { Text(notificationStateSummary(environment)) },
+            headlineContent = {
+                Text("系统跨设备流转设置页", fontWeight = FontWeight.SemiBold)
+            },
         )
 
         Row(
@@ -163,16 +162,3 @@ private fun EnvironmentRow(
         },
     )
 }
-
-private fun notificationStateSummary(environment: EnvironmentSnapshot?): String {
-    if (environment == null) return "正在读取状态"
-    return "本机接收 ${environment.notificationReceiveState.shortLabel} · " +
-        "同步本机 ${environment.notificationSendState.shortLabel}"
-}
-
-private val ToggleState.shortLabel: String
-    get() = when (this) {
-        ToggleState.ENABLED -> "已开启"
-        ToggleState.DISABLED -> "未开启"
-        ToggleState.UNKNOWN -> "未知"
-    }

@@ -69,7 +69,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         when (val result = settingsLauncher.openCrossDeviceNotification()) {
             is LaunchResult.Success -> {
                 val suffix = if (result.method == LaunchMethod.ROOT) "（root 兼容启动）" else ""
-                eventChannel.send(HomeEvent.Message("已打开跨设备通知$suffix"))
+                eventChannel.send(HomeEvent.Message("已打开系统跨设备流转设置页$suffix"))
             }
 
             is LaunchResult.Failure -> {
