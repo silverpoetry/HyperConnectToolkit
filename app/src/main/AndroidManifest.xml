@@ -14,6 +14,7 @@
     </queries>
 
     <application
+        android:name=".app.HyperConnectApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
@@ -38,11 +39,7 @@
             android:name=".platform.HookStatusReceiver"
             android:directBootAware="true"
             android:exported="true"
-            android:permission="android.permission.MANAGE_ACTIVITY_TASKS">
-            <intent-filter>
-                <action android:name="com.weichao.hyperconnecttoolkit.action.HOOKS_ACTIVE" />
-            </intent-filter>
-        </receiver>
+            android:permission="android.permission.INTERACT_ACROSS_USERS" />
     </application>
 
 </manifest>

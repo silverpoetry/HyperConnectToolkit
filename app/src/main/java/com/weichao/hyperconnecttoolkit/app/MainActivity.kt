@@ -37,6 +37,7 @@ class MainActivity : ComponentActivity() {
                     onRefresh = viewModel::refresh,
                     onOpenNotificationSettings = viewModel::openCrossDeviceNotification,
                     onRestartServices = viewModel::restartServices,
+                    onFeatureChanged = viewModel::setFeatureEnabled,
                 )
             }
         }

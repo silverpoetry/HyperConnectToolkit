@@ -8,10 +8,8 @@ import com.weichao.hyperconnecttoolkit.domain.model.EnvironmentSnapshot
 import com.weichao.hyperconnecttoolkit.domain.model.ToggleState
 import com.weichao.hyperconnecttoolkit.platform.RootCommand
 import com.weichao.hyperconnecttoolkit.platform.RootShell
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withContext
 
 class AndroidSystemStatusRepository(
     context: Context,
@@ -52,20 +50,20 @@ class AndroidSystemStatusRepository(
         )
     }
 
-    override suspend fun restartTargetProcesses(): RestartResult = withContext(Dispatchers.IO) {
+    override suspend fun restartTargetProcesses(): RestartResult {
         val mirror = rootShell.execute(RootCommand.STOP_MIRROR)
         if (!mirror.isSuccess) {
-            return@withContext RestartResult(false, "妙享中心停止失败：${mirror.output}")
+            return RestartResult(false, "Xiaomi Mirror 停止失败：${mirror.output}")
         }
 
         val miLink = rootShell.execute(RootCommand.STOP_MILINK)
         if (!miLink.isSuccess) {
-            return@withContext RestartResult(false, "互联服务停止失败：${miLink.output}")
+            return RestartResult(false, "MiLink 停止失败：${miLink.output}")
         }
 
-        RestartResult(
+        return RestartResult(
             isSuccess = true,
-            message = "互联服务已重启；下次打开跨设备通知或串流时会载入新钩子",
+            message = "目标服务已停止，将在系统需要时自动重新启动",
         )
     }
 

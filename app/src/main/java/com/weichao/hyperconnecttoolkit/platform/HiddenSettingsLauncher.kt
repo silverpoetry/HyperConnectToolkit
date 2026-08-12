@@ -3,8 +3,6 @@ package com.weichao.hyperconnecttoolkit.platform
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 enum class LaunchMethod {
     DIRECT,
@@ -22,7 +20,7 @@ class HiddenSettingsLauncher(
 ) {
     private val appContext = context.applicationContext
 
-    suspend fun openCrossDeviceNotification(): LaunchResult = withContext(Dispatchers.IO) {
+    suspend fun openCrossDeviceNotification(): LaunchResult {
         val directResult = runCatching {
             appContext.startActivity(
                 Intent().apply {
@@ -33,12 +31,12 @@ class HiddenSettingsLauncher(
         }
 
         if (directResult.isSuccess) {
-            return@withContext LaunchResult.Success(LaunchMethod.DIRECT)
+            return LaunchResult.Success(LaunchMethod.DIRECT)
         }
 
         val rootResult = rootShell.execute(RootCommand.OPEN_CROSS_DEVICE_NOTIFICATION)
         if (rootResult.isSuccess && !rootResult.output.contains("Error", ignoreCase = true)) {
-            LaunchResult.Success(LaunchMethod.ROOT)
+            return LaunchResult.Success(LaunchMethod.ROOT)
         } else {
             val detail = rootResult.output.ifBlank {
                 directResult.exceptionOrNull()?.message ?: "系统拒绝启动隐藏页面"
@@ -47,11 +45,11 @@ class HiddenSettingsLauncher(
                 detail.contains("Permission denied", ignoreCase = true) ||
                 detail.contains("error=13", ignoreCase = true)
             ) {
-                "请先在 KernelSU 的“超级用户”中授予“互联增强”Root 权限"
+                "请先在 KernelSU 的“超级用户”中授予 HyperConnect Toolkit Root 权限"
             } else {
                 detail
             }
-            LaunchResult.Failure(userFacingReason)
+            return LaunchResult.Failure(userFacingReason)
         }
     }
 

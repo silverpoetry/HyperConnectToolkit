@@ -1,14 +1,16 @@
-# 互联增强（HyperConnectToolkit）
+# HyperConnect Toolkit
 
-面向 HyperOS 平板的单一 LSPosed 兼容模块与 Material 3 管理界面。项目合并了此前独立的“跨设备通知解锁”和“妙享横竖屏修复”，并提供系统隐藏的“互联中心 → 跨设备通知”顶层页面入口。
+面向 HyperOS 平板的单一 LSPosed 兼容模块与 Material 3 管理界面。项目合并了此前独立的“跨设备通知解锁”“妙享横竖屏修复”和“MiLink Multi-Channel”，并提供系统隐藏的“互联中心 → 跨设备通知”顶层页面入口。
 
 ## 功能
 
 - 跨设备通知：仅在 MiLink 的本机发现前置检查作用域内放行错误的 Cast 能力位，远端设备仍执行原生能力协商。
-- 通知点击串流：在 Mirror 的稳定 Provider 边界把通知请求转入原生 `performPinIconClick`，完整复用普通应用流转的连接、认证和错误处理。
-- 竖屏内容修复：原生 `PIN_APP` 链路从第一条请求就携带当前窗口宽高；方向解锁仅作用于平板串流 Activity，不依赖首帧后的延迟 resize 补丁。
+- 通知点击串流：在 MiLink 的通知点击工作线程把请求转入原生 `performPinIconClick`，并消费同一次点击自带的重复远端启动命令；串流只建立一条主动通道，完整复用普通应用流转的连接、认证和错误处理。
+- 竖屏内容修复：在稳定消息构造边界校正全屏模式错误交换的首包宽高，使原生 `PIN_APP` 请求与实际屏幕方向一致；后续旋转继续使用系统 resize 链路。
+- MiLink Multi-Channel：仅在 MiLink 核心进程把 AndroidPad 共享通道上限从 1 调整为 2，并只在原生检查返回 `HostNotBound (215)` 时补做官方绑定流程。
+- 独立开关：上述三个功能组均可单独关闭；新配置默认只启用跨设备通知，竖屏串流与 MiLink Multi-Channel 默认关闭。目标进程启动时读取一次配置，关闭的功能不会注册 Hook。
 - 隐藏设置入口：打开 `FeatureNotificationActivity`，即系统原本隐藏的“本机接收通知 / 同步本机通知”双标签页。
-- 运行状态：显示由真实 Mirror 目标进程报告的模块加载状态，以及 Root、MiLink、Mirror 和两个通知安全设置的状态。
+- 运行状态：跨设备通知、竖屏串流和 Multi-Channel 分别显示对应 MiLink Notification、Xiaomi Mirror 与 MiLink Core 进程的实际 Hook 应用状态；另行显示 Root、MiLink、Mirror 和两个通知安全设置的状态。
 
 ## 架构
 
@@ -18,17 +20,21 @@
 Compose Material 3 UI
         ↓ intents / state
 HomeViewModel (StateFlow + one-shot events)
-        ↓
-SystemStatusRepository ─── HiddenSettingsLauncher
-        ↓                         ↓
-fixed-command RootShell      explicit ComponentName
+        ├── FeatureSettingsStore ── libxposed RemotePreferences
+        ├── HookRuntimeStore ←── validated target-process reports
+        └── SystemStatusRepository ─── HiddenSettingsLauncher
+                    ↓                         ↓
+              fixed-command RootShell   explicit ComponentName
 
 LSPosed process boundary
-        ↓
-HyperConnectModule (signature-constrained hooks)
+        ↓ exact package + process routing
+HyperConnectModule
+        ├── MiLinkNotificationHooks
+        ├── PortraitStreamingHooks
+        └── MiLinkMultiChannelHooks
 ```
 
-`ui` 不执行 shell 或反射；`data` 聚合只读设备状态；`platform` 只暴露枚举定义的固定 root 操作，不接收用户构造的命令；`xposed` 是唯一依赖 libxposed API 和 ROM 混淆符号的代码区。
+`ui` 不执行 shell 或反射；`config` 通过 libxposed 官方服务同步开关；`data` 聚合只读设备状态；`platform` 只暴露枚举定义的固定 root 操作，不接收用户构造的命令；`xposed` 是唯一依赖 ROM 私有符号的代码区。
 
 更详细的设计与兼容策略见 [ARCHITECTURE.md](ARCHITECTURE.md)。
 
@@ -47,15 +53,16 @@ APK 输出：`app/build/outputs/apk/debug/app-debug.apk`。
 ## 安装与启用
 
 1. 安装 APK。
-2. 在 LSPosed 中启用“互联增强”。
-3. 保留三个静态推荐作用域：
-   - `互联增强`（仅作旧版 LSPosed 的兼容握手；新版状态以 Mirror 目标进程回报为准）
+2. 在 LSPosed 中启用“HyperConnect Toolkit”。
+3. 保留两个静态推荐作用域：
    - `互联互通服务` / `com.milink.service`
    - `妙享中心` / `com.xiaomi.mirror`
 4. 在 App 中点击“重启服务”，或重启设备。
-5. 确认统一模块工作后，禁用旧的 HyperNotify 与 HyperconnectRotation，避免重复日志与重复尺寸消息。
+5. 确认统一模块工作后，禁用旧的 HyperNotify、HyperconnectRotation 与 MiLink Multi-Channel，避免同一方法被多个模块重复 Hook。
 
-“模块已生效”状态不是根据开关或 LSPosed 私有数据库猜测，而是在 Mirror 的 `Application.attach` 根生命周期完成、目标 Hook 已装载后，由目标进程携带原始 UID 回报。部分 LSPosed 版本不注入模块自身 App，这不会再造成“等待激活”的误报。
+功能开关通过 libxposed `RemotePreferences` 保存。更改开关后点击“重启服务”；已经注册到运行中进程的方法无法动态卸载，只有新进程会按新配置决定是否注册 Hook。
+
+应用状态不是根据开关或 LSPosed 私有数据库猜测。MiLink Notification、MiLink Core 与 Xiaomi Mirror 只在各自完整功能 Hook 成功注册后独立回报。接收端同时校验系统签名权限、原始发送 UID、包名、精确进程、模块版本和进程允许的唯一功能位；证据还按当前 APK 版本和本次开机隔离。一个目标进程成功不会掩盖另一个目标进程未加载或不兼容的状态。
 
 ## 兼容与回滚
 
