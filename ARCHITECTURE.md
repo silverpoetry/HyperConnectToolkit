@@ -27,7 +27,6 @@ A disabled group never calls `hook(...)`. Reflection bindings for Notification a
 `RootShell` accepts `RootCommand`, an enum whose command strings are compile-time constants. There is no public arbitrary-shell method and no user input is interpolated. Root is used for:
 
 - a read-only UID probe;
-- two read-only `Settings.Secure` fallbacks;
 - launching one audited HyperOS component if direct launch is denied;
 - force-stopping the two explicit scope packages after confirmation.
 

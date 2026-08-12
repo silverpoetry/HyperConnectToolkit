@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build signed APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7.0.1
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v6.2.0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5.7.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6.2.0
+
+      - name: Verify tag matches application version
+        shell: bash
+        run: |
+          version_name="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)"
+          test -n "$version_name"
+          test "v$version_name" = "$GITHUB_REF_NAME"
+
+      - name: Restore release keystore
+        shell: bash
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$RELEASE_KEYSTORE_BASE64"
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/hyperconnect-toolkit-release.jks"
+          chmod 600 "$RUNNER_TEMP/hyperconnect-toolkit-release.jks"
+
+      - name: Build signed release
+        env:
+          HYPERCONNECT_KEYSTORE_PATH: ${{ runner.temp }}/hyperconnect-toolkit-release.jks
+          HYPERCONNECT_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          HYPERCONNECT_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          HYPERCONNECT_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: >-
+          ./gradlew --no-daemon
+          :app:testDebugUnitTest
+          :app:lintRelease
+          :app:assembleRelease
+
+      - name: Verify and name artifact
+        shell: bash
+        run: |
+          source_apk="app/build/outputs/apk/release/app-release.apk"
+          test -f "$source_apk"
+          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$apksigner"
+          "$apksigner" verify --verbose --print-certs "$source_apk"
+          artifact="HyperConnectToolkit-$GITHUB_REF_NAME.apk"
+          cp "$source_apk" "$artifact"
+          sha256sum "$artifact" > "$artifact.sha256"
+
+      - name: Prepare release notes
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v heading="## [$version]" '
+            index($0, heading) == 1 { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          test -s release-notes.md
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: >-
+          gh release create "$GITHUB_REF_NAME"
+          "HyperConnectToolkit-$GITHUB_REF_NAME.apk"
+          "HyperConnectToolkit-$GITHUB_REF_NAME.apk.sha256"
+          --verify-tag
+          --title "HyperConnect Toolkit $GITHUB_REF_NAME"
+          --notes-file release-notes.md

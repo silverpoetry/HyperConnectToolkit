@@ -1,0 +1,57 @@
+name: Bug report
+description: Report a reproducible MiLink, notification circulation, portrait, or compatibility problem
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: checkboxes
+    attributes:
+      label: Safety and privacy
+      options:
+        - label: I have a working recovery path if MiLink or Xiaomi Mirror fails to start.
+          required: true
+        - label: I use an official release from this repository.
+          required: true
+        - label: I removed account data, notification content, device identifiers, IP addresses, and proprietary files.
+          required: true
+  - type: input
+    attributes:
+      label: Android, HyperOS, and LSPosed versions
+      placeholder: Android API / HyperOS build / LSPosed version
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Module version
+      placeholder: App version shown in About
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: Affected feature
+      options:
+        - Unlock cross-device notification circulation
+        - Portrait app streaming
+        - MiLink Multi-Channel
+        - Hidden system circulation settings page
+        - Installation or status reporting
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Reproduction steps
+      description: Start from the smallest reproducible sequence and state which feature switches are enabled.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Redacted LSPosed evidence
+      description: Include only the smallest relevant HyperConnectToolkit log or state-report excerpt. Do not attach OEM APKs or full framework dumps.
+      render: text
+    validations:
+      required: true

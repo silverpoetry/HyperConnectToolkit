@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/silverpoetry/HyperConnectToolkit/security/advisories/new
+    about: Report an exploitable or privileged-process issue privately.
+  - name: Installation and troubleshooting
+    url: https://github.com/silverpoetry/HyperConnectToolkit/blob/main/docs/troubleshooting.md
+    about: Check the documented recovery, scope, and logging steps first.

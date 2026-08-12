@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material3.AlertDialog
@@ -46,6 +47,7 @@ fun HomeRoute(
     onOpenNotificationSettings: () -> Unit,
     onRestartServices: () -> Unit,
     onFeatureChanged: (Feature, Boolean) -> Unit,
+    onOpenAbout: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var showRestartConfirmation by remember { mutableStateOf(false) }
@@ -65,6 +67,7 @@ fun HomeRoute(
         onOpenNotificationSettings = onOpenNotificationSettings,
         onRequestRestart = { showRestartConfirmation = true },
         onFeatureChanged = onFeatureChanged,
+        onOpenAbout = onOpenAbout,
     )
 
     if (showRestartConfirmation) {
@@ -86,6 +89,7 @@ private fun HomeScreen(
     onOpenNotificationSettings: () -> Unit,
     onRequestRestart: () -> Unit,
     onFeatureChanged: (Feature, Boolean) -> Unit,
+    onOpenAbout: () -> Unit,
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -95,6 +99,9 @@ private fun HomeScreen(
             TopAppBar(
                 title = { Text("HyperConnect Toolkit") },
                 actions = {
+                    IconButton(onClick = onOpenAbout) {
+                        Icon(Icons.Rounded.Info, contentDescription = "关于")
+                    }
                     IconButton(
                         onClick = onRefresh,
                         enabled = !state.isRefreshing && !state.isActionRunning,
