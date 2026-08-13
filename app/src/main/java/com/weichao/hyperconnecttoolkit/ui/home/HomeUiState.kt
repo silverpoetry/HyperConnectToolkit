@@ -12,6 +12,7 @@ data class HomeUiState(
     val environment: EnvironmentSnapshot? = null,
     val features: FeatureConfiguration = FeatureConfiguration(),
     val pendingRestartFeatures: Set<Feature> = emptySet(),
+    val isDiagnosticRestartPending: Boolean = false,
 )
 
 sealed interface HomeEvent {

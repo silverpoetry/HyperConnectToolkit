@@ -13,6 +13,7 @@ public final class HookFeatureFlagsTest {
         assertFalse(flags.crossDeviceNotification);
         assertTrue(flags.portraitStreaming);
         assertFalse(flags.miLinkMultiChannel);
+        assertFalse(flags.detailedLogging);
     }
 
     @Test
@@ -22,5 +23,6 @@ public final class HookFeatureFlagsTest {
         assertFalse(flags.crossDeviceNotification);
         assertFalse(flags.portraitStreaming);
         assertFalse(flags.miLinkMultiChannel);
+        assertFalse(flags.detailedLogging);
     }
 }

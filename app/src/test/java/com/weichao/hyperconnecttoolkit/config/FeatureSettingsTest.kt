@@ -12,5 +12,6 @@ class FeatureSettingsTest {
         assertTrue(settings.crossDeviceNotification)
         assertFalse(settings.portraitStreaming)
         assertFalse(settings.miLinkMultiChannel)
+        assertFalse(settings.detailedLogging)
     }
 }

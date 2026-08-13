@@ -31,11 +31,13 @@ final class MiLinkNotificationHooks {
             "com.xiaomi.mirror.callprovider";
 
     private final XposedModule module;
+    private final DiagnosticLogger diagnostics;
     private final ThreadLocal<Integer> localDiscoveryDepth = new ThreadLocal<>();
     private final NotificationClickSession clickSession = new NotificationClickSession();
 
-    MiLinkNotificationHooks(XposedModule module) {
+    MiLinkNotificationHooks(XposedModule module, DiagnosticLogger diagnostics) {
         this.module = module;
+        this.diagnostics = diagnostics;
     }
 
     /** Resolves every vendor method before registering the feature as one compatibility unit. */
@@ -44,14 +46,22 @@ final class MiLinkNotificationHooks {
             Bindings bindings = Bindings.resolve(classLoader);
             installDiscoveryHooks(bindings);
             installClickHooks(bindings);
+            diagnostics.event("functional_hooks", "state", "installed");
             module.log(Log.INFO, TAG, "Installed MiLink cross-device notification hooks");
             return true;
         } catch (Throwable error) {
+            diagnostics.error("functional_hooks", error, "state", "incompatible");
             module.log(Log.ERROR, TAG,
                     "MiLink cross-device notification hooks are incompatible",
                     error);
             return false;
         }
+    }
+
+    void installDiagnostics(ClassLoader classLoader, boolean functionalDiscoveryInstalled) {
+        new NotificationDiscoveryDiagnostics(module, diagnostics).install(
+                classLoader,
+                functionalDiscoveryInstalled);
     }
 
     /**
@@ -62,7 +72,17 @@ final class MiLinkNotificationHooks {
         module.hook(bindings.localServiceSupport).intercept(chain -> {
             enterLocalDiscovery();
             try {
-                return chain.proceed();
+                Object result = chain.proceed();
+                diagnostics.trace(
+                        "local_service_support",
+                        80,
+                        "local_service_support",
+                        "service", diagnostics.summarize(chain.getArg(0)),
+                        "result", diagnostics.summarize(result));
+                return result;
+            } catch (Throwable error) {
+                diagnostics.error("local_service_support", error);
+                throw error;
             } finally {
                 exitLocalDiscovery();
             }
@@ -70,9 +90,33 @@ final class MiLinkNotificationHooks {
 
         module.hook(bindings.castSupport).intercept(chain -> {
             if (isLocalDiscoveryActive()) {
+                diagnostics.trace(
+                        "cast_support_local",
+                        80,
+                        "cast_support",
+                        "device", diagnostics.identifier((String) chain.getArg(0)),
+                        "scope", "local_prerequisite",
+                        "decision", "override_true");
                 return Boolean.TRUE;
             }
-            return chain.proceed();
+            try {
+                Object result = chain.proceed();
+                diagnostics.trace(
+                        "cast_support_remote",
+                        200,
+                        "cast_support",
+                        "device", diagnostics.identifier((String) chain.getArg(0)),
+                        "scope", "remote_device",
+                        "result", diagnostics.summarize(result));
+                return result;
+            } catch (Throwable error) {
+                diagnostics.error(
+                        "cast_support",
+                        error,
+                        "scope", "remote_device",
+                        "device", diagnostics.identifier((String) chain.getArg(0)));
+                throw error;
+            }
         });
     }
 
@@ -102,6 +146,10 @@ final class MiLinkNotificationHooks {
                 return chain.proceed();
             }
 
+            diagnostics.event(
+                    "notification_duplicate_consumed",
+                    "device", diagnostics.identifier(deviceId),
+                    "package", diagnostics.identifier(packageName));
             notifyPublishSuccess(chain.getArg(2), bindings.publishResult);
             module.log(Log.INFO, TAG,
                     "Consumed the duplicate passive notification stream request");
@@ -118,6 +166,11 @@ final class MiLinkNotificationHooks {
             }
 
             boolean dispatched = dispatchPinApp(context, deviceId, packageName);
+            diagnostics.event(
+                    "notification_click",
+                    "device", diagnostics.identifier(deviceId),
+                    "package", diagnostics.identifier(packageName),
+                    "pinAppDispatched", Boolean.toString(dispatched));
             // The stock worker calls handleNotification even when this callback reports failure.
             // Consume that paired command so a failed active request cannot create a second stream.
             clickSession.begin(deviceId, packageName, SystemClock.elapsedRealtime());
@@ -145,10 +198,13 @@ final class MiLinkNotificationHooks {
                     null,
                     extras);
             if (result != null) {
+                diagnostics.event("pin_app_provider", "result", "non_null");
                 return true;
             }
+            diagnostics.event("pin_app_provider", "result", "null");
             module.log(Log.ERROR, TAG, "PIN_APP provider returned no result");
         } catch (Throwable error) {
+            diagnostics.error("pin_app_provider", error);
             module.log(Log.ERROR, TAG, "Could not dispatch notification through PIN_APP", error);
         }
         return false;

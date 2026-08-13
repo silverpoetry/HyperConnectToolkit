@@ -9,6 +9,7 @@ import android.content.SharedPreferences
 import android.os.UserManager
 import com.weichao.hyperconnecttoolkit.config.FeaturePreferences
 import com.weichao.hyperconnecttoolkit.config.FeatureSettingsStore
+import com.weichao.hyperconnecttoolkit.diagnostics.XposedFrameworkStore
 import com.weichao.hyperconnecttoolkit.platform.HookRuntimeStore
 import io.github.libxposed.service.XposedService
 import io.github.libxposed.service.XposedServiceHelper
@@ -55,6 +56,7 @@ class HyperConnectApplication : Application(), XposedServiceHelper.OnServiceList
 
     override fun onServiceBind(boundService: XposedService) {
         service = boundService
+        XposedFrameworkStore.bind(boundService)
         val previousPreferences = remotePreferences
         val preferences = runCatching {
             boundService.getRemotePreferences(FeaturePreferences.GROUP)
@@ -69,6 +71,7 @@ class HyperConnectApplication : Application(), XposedServiceHelper.OnServiceList
     override fun onServiceDied(deadService: XposedService) {
         if (service !== deadService) return
         service = null
+        XposedFrameworkStore.unbind()
         val preferences = remotePreferences
         remotePreferences = null
         FeatureSettingsStore.unbindRemote(preferences)

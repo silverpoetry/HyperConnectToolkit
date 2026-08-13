@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.6.0-diagnostic.1] - 2026-08-13
+
+### Added
+
+- Opt-in, session-scoped device-discovery tracing through libxposed's official logging interface.
+- Decision-level coverage for discovery startup, local NotificationTrans capability, service callbacks, device-type filters, MiLink/Cast capability checks, region filtering, and final candidate acceptance.
+- One-tap sanitized export of bounded LSPosed and companion-app logs through Android's document picker.
+- Self-contained component snapshot for Android/HyperOS, LSPosed framework/API/scope, MiLink, Xiaomi Mirror, Continuity SDK, and system settings versions.
+
+### Security
+
+- Detailed observers are installed only in the audited target process after explicit opt-in and service restart.
+- Diagnostic events are rate-limited and globally bounded; raw device IDs and notification package names are replaced with session-scoped hashes.
+- Root log access is one fixed, read-only, size-bounded command. Exported text receives a second privacy-redaction pass.
+
 ## [1.5.0] - 2026-08-12
 
 ### Added
@@ -28,4 +43,5 @@ All notable changes to this project are documented in this file.
 - Unit tests cover settings, status policy, feature masks, notification transaction lifetime, orientation policy, and Host-binding/channel policy.
 - `testDebugUnitTest`, `lintDebug`, `assembleDebug`, and `git diff --check` pass before the initial public publication.
 
+[1.6.0-diagnostic.1]: https://github.com/silverpoetry/HyperConnectToolkit/releases/tag/v1.6.0-diagnostic.1
 [1.5.0]: https://github.com/silverpoetry/HyperConnectToolkit/releases/tag/v1.5.0

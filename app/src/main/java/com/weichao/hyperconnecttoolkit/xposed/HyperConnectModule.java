@@ -4,6 +4,7 @@ import android.app.Application;
 import android.content.SharedPreferences;
 import android.util.Log;
 
+import com.weichao.hyperconnecttoolkit.BuildConfig;
 import com.weichao.hyperconnecttoolkit.config.FeaturePreferences;
 import com.weichao.hyperconnecttoolkit.platform.HookStatusContract;
 
@@ -29,22 +30,32 @@ public final class HyperConnectModule extends XposedModule {
         if (target == null) return;
 
         HookFeatureFlags features = readFeatureFlags();
+        DiagnosticLogger diagnostics = new DiagnosticLogger(
+                this,
+                features.detailedLogging,
+                features.diagnosticSessionId,
+                target.processName);
         log(Log.INFO, TAG,
                 "Feature snapshot for " + target.processName
                         + ": notification=" + features.crossDeviceNotification
                         + ", portrait=" + features.portraitStreaming
-                        + ", multiChannel=" + features.miLinkMultiChannel);
+                        + ", multiChannel=" + features.miLinkMultiChannel
+                        + ", detailedLogging=" + features.detailedLogging);
+        recordDiagnosticBootstrap(target, features, diagnostics);
 
         switch (target) {
             case MILINK_NOTIFICATION -> installNotificationFeature(
                     param.getDefaultClassLoader(),
-                    features);
+                    features,
+                    diagnostics);
             case MILINK_CORE -> installMultiChannelFeature(
                     param.getDefaultClassLoader(),
-                    features);
+                    features,
+                    diagnostics);
             case XIAOMI_MIRROR -> installPortraitFeature(
                     param.getDefaultClassLoader(),
-                    features);
+                    features,
+                    diagnostics);
         }
     }
 
@@ -67,44 +78,57 @@ public final class HyperConnectModule extends XposedModule {
 
     private void installNotificationFeature(
             ClassLoader classLoader,
-            HookFeatureFlags features) {
-        if (!features.crossDeviceNotification) return;
-        if (!isTablet(classLoader)) {
+            HookFeatureFlags features,
+            DiagnosticLogger diagnostics) {
+        boolean tablet = isTablet(classLoader, diagnostics);
+        MiLinkNotificationHooks hooks = new MiLinkNotificationHooks(this, diagnostics);
+        boolean installed = false;
+        if (features.crossDeviceNotification && tablet) {
+            installed = hooks.install(classLoader);
+        } else if (features.crossDeviceNotification) {
             log(Log.INFO, TAG, "Skipped tablet notification compatibility on a phone");
-            return;
         }
 
-        boolean installed = new MiLinkNotificationHooks(this).install(classLoader);
-        reportInstalledFeature(
+        if (features.detailedLogging) {
+            hooks.installDiagnostics(classLoader, installed);
+        }
+        startRuntime(
                 installed,
-                TargetProcess.MILINK_NOTIFICATION.packageName,
-                TargetProcess.MILINK_NOTIFICATION.processName,
+                diagnostics,
+                TargetProcess.MILINK_NOTIFICATION,
                 HookStatusContract.FEATURE_CROSS_DEVICE_NOTIFICATION);
     }
 
     private void installMultiChannelFeature(
             ClassLoader classLoader,
-            HookFeatureFlags features) {
-        if (!features.miLinkMultiChannel) return;
-        boolean installed = new MiLinkMultiChannelHooks(this).install(classLoader);
-        reportInstalledFeature(
+            HookFeatureFlags features,
+            DiagnosticLogger diagnostics) {
+        boolean installed = features.miLinkMultiChannel
+                && new MiLinkMultiChannelHooks(this).install(classLoader);
+        startRuntime(
                 installed,
-                TargetProcess.MILINK_CORE.packageName,
-                TargetProcess.MILINK_CORE.processName,
+                diagnostics,
+                TargetProcess.MILINK_CORE,
                 HookStatusContract.FEATURE_MILINK_MULTI_CHANNEL);
     }
 
     private void installPortraitFeature(
             ClassLoader classLoader,
-            HookFeatureFlags features) {
-        if (!features.portraitStreaming) return;
-        if (!isTablet(classLoader)) {
+            HookFeatureFlags features,
+            DiagnosticLogger diagnostics) {
+        if (!features.portraitStreaming) {
+            startRuntime(false, diagnostics, TargetProcess.XIAOMI_MIRROR, 0);
+            return;
+        }
+        if (!isTablet(classLoader, diagnostics)) {
             log(Log.INFO, TAG, "Skipped tablet portrait compatibility on a phone");
+            startRuntime(false, diagnostics, TargetProcess.XIAOMI_MIRROR, 0);
             return;
         }
 
         mirrorRuntime = new TargetProcessRuntime(
                 this,
+                diagnostics,
                 TargetProcess.XIAOMI_MIRROR.packageName,
                 TargetProcess.XIAOMI_MIRROR.processName);
         portraitHooks = new PortraitStreamingHooks(
@@ -115,18 +139,42 @@ public final class HyperConnectModule extends XposedModule {
         }
     }
 
-    private void reportInstalledFeature(
+    private void startRuntime(
             boolean installed,
-            String sourcePackage,
-            String sourceProcess,
+            DiagnosticLogger diagnostics,
+            TargetProcess target,
             int feature) {
-        if (!installed) return;
+        if (!installed && !diagnostics.isEnabled()) return;
         TargetProcessRuntime runtime = new TargetProcessRuntime(
                 this,
-                sourcePackage,
-                sourceProcess);
-        if (runtime.installLifecycleHook()) {
+                diagnostics,
+                target.packageName,
+                target.processName);
+        if (runtime.installLifecycleHook() && installed) {
             runtime.recordInstalledFeature(feature);
+        }
+    }
+
+    private void recordDiagnosticBootstrap(
+            TargetProcess target,
+            HookFeatureFlags features,
+            DiagnosticLogger diagnostics) {
+        if (!diagnostics.isEnabled()) return;
+        try {
+            diagnostics.event(
+                    "module_loaded",
+                    "moduleVersion", BuildConfig.VERSION_NAME + "(" + BuildConfig.VERSION_CODE + ")",
+                    "targetPackage", target.packageName,
+                    "framework", getFrameworkName(),
+                    "frameworkVersion", getFrameworkVersion()
+                            + "(" + getFrameworkVersionCode() + ")",
+                    "frameworkApi", Integer.toString(getApiVersion()),
+                    "frameworkProperties", Long.toUnsignedString(getFrameworkProperties()),
+                    "notificationEnabled", Boolean.toString(features.crossDeviceNotification),
+                    "portraitEnabled", Boolean.toString(features.portraitStreaming),
+                    "multiChannelEnabled", Boolean.toString(features.miLinkMultiChannel));
+        } catch (Throwable error) {
+            diagnostics.error("module_loaded", error);
         }
     }
 
@@ -142,11 +190,14 @@ public final class HyperConnectModule extends XposedModule {
         }
     }
 
-    private boolean isTablet(ClassLoader classLoader) {
+    private boolean isTablet(ClassLoader classLoader, DiagnosticLogger diagnostics) {
         try {
-            return DeviceFormFactor.isTablet(classLoader);
+            boolean tablet = DeviceFormFactor.isTablet(classLoader);
+            diagnostics.event("form_factor", "isTablet", Boolean.toString(tablet));
+            return tablet;
         } catch (Throwable error) {
             log(Log.WARN, TAG, "Could not read HyperOS tablet form factor", error);
+            diagnostics.error("form_factor", error, "isTablet", "unknown");
             return false;
         }
     }

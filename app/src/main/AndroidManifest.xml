@@ -11,6 +11,8 @@
     <queries>
         <package android:name="com.milink.service" />
         <package android:name="com.xiaomi.mirror" />
+        <package android:name="com.xiaomi.continuity.sdkapp" />
+        <package android:name="com.android.settings" />
     </queries>
 
     <application

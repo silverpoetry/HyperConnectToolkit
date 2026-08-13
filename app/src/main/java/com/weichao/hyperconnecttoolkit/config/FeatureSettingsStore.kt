@@ -7,6 +7,7 @@ import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.UUID
 
 /**
  * Owns the app-side mirror of libxposed RemotePreferences.
@@ -93,6 +94,25 @@ object FeatureSettingsStore {
     fun setEnabled(feature: Feature, enabled: Boolean): Boolean = synchronized(lock) {
         check(::localPreferences.isInitialized) { "FeatureSettingsStore is not initialized" }
         val updated = mutableConfiguration.value.settings.with(feature, enabled)
+        save(updated)
+    }
+
+    /** Starts a fresh trace session whenever detailed logging transitions to enabled. */
+    fun setDetailedLoggingEnabled(enabled: Boolean): Boolean = synchronized(lock) {
+        check(::localPreferences.isInitialized) { "FeatureSettingsStore is not initialized" }
+        val current = mutableConfiguration.value.settings
+        val updated = current.copy(
+            detailedLogging = enabled,
+            diagnosticSessionId = if (enabled && !current.detailedLogging) {
+                UUID.randomUUID().toString().replace("-", "").take(12)
+            } else {
+                current.diagnosticSessionId
+            },
+        )
+        save(updated)
+    }
+
+    private fun save(updated: FeatureSettings): Boolean {
         val localSaved = commitLocal(updated, pendingRemoteWrite = true)
         if (!localSaved) return false
 
@@ -105,7 +125,7 @@ object FeatureSettingsStore {
             isRemoteAvailable = remote != null,
             hasPendingRemoteWrite = !fullySynchronized,
         )
-        true
+        return true
     }
 
     private fun read(preferences: SharedPreferences): FeatureSettings = FeatureSettings(
@@ -121,6 +141,14 @@ object FeatureSettingsStore {
             FeaturePreferences.KEY_MILINK_MULTI_CHANNEL,
             FeaturePreferences.DEFAULT_MILINK_MULTI_CHANNEL_ENABLED,
         ),
+        detailedLogging = preferences.getBoolean(
+            FeaturePreferences.KEY_DETAILED_LOGGING,
+            FeaturePreferences.DEFAULT_DETAILED_LOGGING_ENABLED,
+        ),
+        diagnosticSessionId = preferences.getString(
+            FeaturePreferences.KEY_DIAGNOSTIC_SESSION_ID,
+            "",
+        ).orEmpty(),
     )
 
     private fun commitLocal(
@@ -151,10 +179,20 @@ object FeatureSettingsStore {
             FeaturePreferences.KEY_MILINK_MULTI_CHANNEL,
             settings.miLinkMultiChannel,
         )
+        .putBoolean(
+            FeaturePreferences.KEY_DETAILED_LOGGING,
+            settings.detailedLogging,
+        )
+        .putString(
+            FeaturePreferences.KEY_DIAGNOSTIC_SESSION_ID,
+            settings.diagnosticSessionId,
+        )
 
     private val FEATURE_KEYS = setOf(
         FeaturePreferences.KEY_CROSS_DEVICE_NOTIFICATION,
         FeaturePreferences.KEY_PORTRAIT_STREAMING,
         FeaturePreferences.KEY_MILINK_MULTI_CHANNEL,
+        FeaturePreferences.KEY_DETAILED_LOGGING,
+        FeaturePreferences.KEY_DIAGNOSTIC_SESSION_ID,
     )
 }

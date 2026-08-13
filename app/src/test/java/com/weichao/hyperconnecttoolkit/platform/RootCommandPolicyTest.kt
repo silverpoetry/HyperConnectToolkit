@@ -14,6 +14,7 @@ class RootCommandPolicyTest {
                 RootCommand.OPEN_CROSS_DEVICE_NOTIFICATION,
                 RootCommand.STOP_MIRROR,
                 RootCommand.STOP_MILINK,
+                RootCommand.EXPORT_LSPOSED_MODULE_LOG,
             ),
             RootCommand.entries.toSet(),
         )
@@ -22,6 +23,18 @@ class RootCommandPolicyTest {
             assertFalse(command.shellText.contains('\r'))
             assertFalse(command.shellText.contains("$"))
         }
+    }
+
+    @Test
+    fun `diagnostic export is fixed read-only and bounded`() {
+        val command = RootCommand.EXPORT_LSPOSED_MODULE_LOG
+
+        assertTrue(command.shellText.startsWith("grep -a -F "))
+        assertTrue(command.shellText.contains("/data/adb/lspd/log"))
+        assertTrue(command.shellText.endsWith("tail -c 2097152"))
+        assertFalse(command.shellText.contains(" rm "))
+        assertFalse(command.shellText.contains(" mv "))
+        assertEquals(20L, command.timeoutSeconds)
     }
 
     @Test

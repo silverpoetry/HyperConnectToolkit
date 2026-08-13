@@ -7,9 +7,12 @@ public final class FeaturePreferences {
             "cross_device_notification";
     public static final String KEY_PORTRAIT_STREAMING = "portrait_streaming";
     public static final String KEY_MILINK_MULTI_CHANNEL = "milink_multi_channel";
+    public static final String KEY_DETAILED_LOGGING = "detailed_logging";
+    public static final String KEY_DIAGNOSTIC_SESSION_ID = "diagnostic_session_id";
     public static final boolean DEFAULT_CROSS_DEVICE_NOTIFICATION_ENABLED = true;
     public static final boolean DEFAULT_PORTRAIT_STREAMING_ENABLED = false;
     public static final boolean DEFAULT_MILINK_MULTI_CHANNEL_ENABLED = false;
+    public static final boolean DEFAULT_DETAILED_LOGGING_ENABLED = false;
 
     private FeaturePreferences() {
     }

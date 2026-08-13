@@ -23,14 +23,20 @@ final class TargetProcessRuntime {
             "com.weichao.hyperconnecttoolkit.platform.HookStatusReceiver";
 
     private final XposedModule module;
+    private final DiagnosticLogger diagnostics;
     private final String sourcePackage;
     private final String sourceProcess;
     private volatile Context applicationContext;
     private int installedFeatures;
     private int reportedFeatures;
 
-    TargetProcessRuntime(XposedModule module, String sourcePackage, String sourceProcess) {
+    TargetProcessRuntime(
+            XposedModule module,
+            DiagnosticLogger diagnostics,
+            String sourcePackage,
+            String sourceProcess) {
         this.module = module;
+        this.diagnostics = diagnostics;
         this.sourcePackage = sourcePackage;
         this.sourceProcess = sourceProcess;
     }
@@ -45,6 +51,7 @@ final class TargetProcessRuntime {
                 if (chain.getArg(0) instanceof Context context) {
                     Context appContext = context.getApplicationContext();
                     applicationContext = appContext != null ? appContext : context;
+                    DiagnosticEnvironment.record(diagnostics, applicationContext);
                     reportPendingFeatures();
                 }
                 return result;

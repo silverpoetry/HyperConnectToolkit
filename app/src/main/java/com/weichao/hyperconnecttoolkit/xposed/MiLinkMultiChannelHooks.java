@@ -70,11 +70,11 @@ final class MiLinkMultiChannelHooks {
             Object hostId = chain.getArg(0);
             try {
                 if (bindings.hostBinding.bind(hostId)) {
-                    module.log(Log.INFO, TAG, "MiLink official Host bind completed: " + hostId);
+                    module.log(Log.INFO, TAG, "MiLink official Host bind completed");
                     return HostBindingRepair.SUCCESS;
                 }
             } catch (ReflectiveOperationException | RuntimeException error) {
-                module.log(Log.WARN, TAG, "MiLink official Host bind failed: " + hostId, error);
+                module.log(Log.WARN, TAG, "MiLink official Host bind failed", error);
             }
             return result;
         });

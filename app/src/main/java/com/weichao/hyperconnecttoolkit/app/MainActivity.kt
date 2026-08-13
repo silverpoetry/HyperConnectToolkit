@@ -7,6 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -16,9 +17,15 @@ import com.weichao.hyperconnecttoolkit.ui.about.AboutRoute
 import com.weichao.hyperconnecttoolkit.ui.home.HomeRoute
 import com.weichao.hyperconnecttoolkit.ui.home.HomeViewModel
 import com.weichao.hyperconnecttoolkit.ui.theme.HyperConnectTheme
+import com.weichao.hyperconnecttoolkit.diagnostics.DiagnosticLogExporter
 
 class MainActivity : ComponentActivity() {
     private val viewModel by viewModels<HomeViewModel>()
+    private val createDiagnosticDocument = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain"),
+    ) { destination ->
+        if (destination != null) viewModel.exportDiagnostics(destination)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
@@ -49,6 +56,12 @@ class MainActivity : ComponentActivity() {
                         onOpenNotificationSettings = viewModel::openCrossDeviceNotification,
                         onRestartServices = viewModel::restartServices,
                         onFeatureChanged = viewModel::setFeatureEnabled,
+                        onDetailedLoggingChanged = viewModel::setDetailedLoggingEnabled,
+                        onExportDiagnostics = {
+                            createDiagnosticDocument.launch(
+                                DiagnosticLogExporter.defaultFileName(),
+                            )
+                        },
                         onOpenAbout = { showAbout = true },
                     )
                 }

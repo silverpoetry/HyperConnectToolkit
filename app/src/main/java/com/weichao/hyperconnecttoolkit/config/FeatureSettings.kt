@@ -5,6 +5,8 @@ data class FeatureSettings(
         FeaturePreferences.DEFAULT_CROSS_DEVICE_NOTIFICATION_ENABLED,
     val portraitStreaming: Boolean = FeaturePreferences.DEFAULT_PORTRAIT_STREAMING_ENABLED,
     val miLinkMultiChannel: Boolean = FeaturePreferences.DEFAULT_MILINK_MULTI_CHANNEL_ENABLED,
+    val detailedLogging: Boolean = FeaturePreferences.DEFAULT_DETAILED_LOGGING_ENABLED,
+    val diagnosticSessionId: String = "",
 ) {
     fun with(feature: Feature, enabled: Boolean): FeatureSettings = when (feature) {
         Feature.CROSS_DEVICE_NOTIFICATION -> copy(crossDeviceNotification = enabled)

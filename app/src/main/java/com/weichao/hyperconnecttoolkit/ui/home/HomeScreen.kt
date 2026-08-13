@@ -47,6 +47,8 @@ fun HomeRoute(
     onOpenNotificationSettings: () -> Unit,
     onRestartServices: () -> Unit,
     onFeatureChanged: (Feature, Boolean) -> Unit,
+    onDetailedLoggingChanged: (Boolean) -> Unit,
+    onExportDiagnostics: () -> Unit,
     onOpenAbout: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -67,6 +69,8 @@ fun HomeRoute(
         onOpenNotificationSettings = onOpenNotificationSettings,
         onRequestRestart = { showRestartConfirmation = true },
         onFeatureChanged = onFeatureChanged,
+        onDetailedLoggingChanged = onDetailedLoggingChanged,
+        onExportDiagnostics = onExportDiagnostics,
         onOpenAbout = onOpenAbout,
     )
 
@@ -89,6 +93,8 @@ private fun HomeScreen(
     onOpenNotificationSettings: () -> Unit,
     onRequestRestart: () -> Unit,
     onFeatureChanged: (Feature, Boolean) -> Unit,
+    onDetailedLoggingChanged: (Boolean) -> Unit,
+    onExportDiagnostics: () -> Unit,
     onOpenAbout: () -> Unit,
 ) {
     Scaffold(
@@ -146,6 +152,16 @@ private fun HomeScreen(
                         isBusy = state.isActionRunning,
                         onOpenNotificationSettings = onOpenNotificationSettings,
                         onRequestRestart = onRequestRestart,
+                    )
+                }
+                item {
+                    DiagnosticsCard(
+                        settings = state.features.settings,
+                        isRestartPending = state.isDiagnosticRestartPending,
+                        canExport = state.environment?.isRootAvailable == true,
+                        isBusy = state.isActionRunning,
+                        onDetailedLoggingChanged = onDetailedLoggingChanged,
+                        onExportDiagnostics = onExportDiagnostics,
                     )
                 }
                 item {
