@@ -102,7 +102,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("com.google.android.material:material:1.12.0")
 
-    compileOnly("io.github.libxposed:api:101.0.1")
+    compileOnly("io.github.libxposed:api:102.0.0")
     implementation("io.github.libxposed:service:101.0.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
