@@ -36,7 +36,10 @@ public final class HyperConnectModule extends XposedModule {
                         + ", multiChannel=" + features.miLinkMultiChannel);
 
         switch (target) {
-            case MILINK_NOTIFICATION -> installNotificationFeature(
+            case MILINK_NOTIFICATION_DISCOVERY -> installNotificationDiscoveryFeature(
+                    param.getDefaultClassLoader(),
+                    features);
+            case MILINK_NOTIFICATION_FLOW -> installNotificationFlowFeature(
                     param.getDefaultClassLoader(),
                     features);
             case MILINK_CORE -> installMultiChannelFeature(
@@ -61,11 +64,12 @@ public final class HyperConnectModule extends XposedModule {
         if (portraitHooks.installOrientation(param.getClassLoader())
                 && portraitHooks.isComplete()
                 && mirrorReporterInstalled) {
-            mirrorRuntime.recordInstalledFeature(HookStatusContract.FEATURE_PORTRAIT_STREAMING);
+            mirrorRuntime.recordInstalledCapability(
+                    HookStatusContract.FEATURE_PORTRAIT_STREAMING);
         }
     }
 
-    private void installNotificationFeature(
+    private void installNotificationDiscoveryFeature(
             ClassLoader classLoader,
             HookFeatureFlags features) {
         if (!features.crossDeviceNotification) return;
@@ -74,12 +78,27 @@ public final class HyperConnectModule extends XposedModule {
             return;
         }
 
-        boolean installed = new MiLinkNotificationHooks(this).install(classLoader);
-        reportInstalledFeature(
+        boolean installed = new MiLinkDiscoveryHooks(this).install(classLoader);
+        reportInstalledCapability(
                 installed,
-                TargetProcess.MILINK_NOTIFICATION.packageName,
-                TargetProcess.MILINK_NOTIFICATION.processName,
-                HookStatusContract.FEATURE_CROSS_DEVICE_NOTIFICATION);
+                TargetProcess.MILINK_NOTIFICATION_DISCOVERY,
+                HookStatusContract.COMPONENT_NOTIFICATION_DISCOVERY);
+    }
+
+    private void installNotificationFlowFeature(
+            ClassLoader classLoader,
+            HookFeatureFlags features) {
+        if (!features.crossDeviceNotification) return;
+        if (!isTablet(classLoader)) {
+            log(Log.INFO, TAG, "Skipped tablet notification compatibility on a phone");
+            return;
+        }
+
+        boolean installed = new MiLinkNotificationFlowHooks(this).install(classLoader);
+        reportInstalledCapability(
+                installed,
+                TargetProcess.MILINK_NOTIFICATION_FLOW,
+                HookStatusContract.COMPONENT_NOTIFICATION_FLOW);
     }
 
     private void installMultiChannelFeature(
@@ -87,10 +106,9 @@ public final class HyperConnectModule extends XposedModule {
             HookFeatureFlags features) {
         if (!features.miLinkMultiChannel) return;
         boolean installed = new MiLinkMultiChannelHooks(this).install(classLoader);
-        reportInstalledFeature(
+        reportInstalledCapability(
                 installed,
-                TargetProcess.MILINK_CORE.packageName,
-                TargetProcess.MILINK_CORE.processName,
+                TargetProcess.MILINK_CORE,
                 HookStatusContract.FEATURE_MILINK_MULTI_CHANNEL);
     }
 
@@ -115,18 +133,17 @@ public final class HyperConnectModule extends XposedModule {
         }
     }
 
-    private void reportInstalledFeature(
+    private void reportInstalledCapability(
             boolean installed,
-            String sourcePackage,
-            String sourceProcess,
-            int feature) {
+            TargetProcess target,
+            int capability) {
         if (!installed) return;
         TargetProcessRuntime runtime = new TargetProcessRuntime(
                 this,
-                sourcePackage,
-                sourceProcess);
+                target.packageName,
+                target.processName);
         if (runtime.installLifecycleHook()) {
-            runtime.recordInstalledFeature(feature);
+            runtime.recordInstalledCapability(capability);
         }
     }
 

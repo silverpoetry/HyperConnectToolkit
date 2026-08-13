@@ -33,8 +33,11 @@ class HookStatusReceiver : BroadcastReceiver() {
             Log.w(TAG, "Rejected invalid Hook report from uid=$senderUid")
             return
         }
-        HookRuntimeStore.recordAppliedFeatures(context, report.featureMask)
-        Log.i(TAG, "Recorded Hook features=${report.featureMask} from ${report.target.processName}")
+        HookRuntimeStore.recordReportedCapabilities(context, report.featureMask)
+        Log.i(
+            TAG,
+            "Recorded Hook capabilities=${report.featureMask} from ${report.target.processName}",
+        )
     }
 
     companion object {

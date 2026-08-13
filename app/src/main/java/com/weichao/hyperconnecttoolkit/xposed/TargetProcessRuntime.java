@@ -26,8 +26,8 @@ final class TargetProcessRuntime {
     private final String sourcePackage;
     private final String sourceProcess;
     private volatile Context applicationContext;
-    private int installedFeatures;
-    private int reportedFeatures;
+    private int installedCapabilities;
+    private int reportedCapabilities;
 
     TargetProcessRuntime(XposedModule module, String sourcePackage, String sourceProcess) {
         this.module = module;
@@ -61,14 +61,14 @@ final class TargetProcessRuntime {
         return applicationContext;
     }
 
-    synchronized void recordInstalledFeature(int feature) {
-        installedFeatures |= feature & HookStatusContract.ALL_FEATURES;
+    synchronized void recordInstalledCapability(int capability) {
+        installedCapabilities |= capability & HookStatusContract.ALL_REPORT_BITS;
         reportPendingFeatures();
     }
 
     private synchronized void reportPendingFeatures() {
         Context context = applicationContext;
-        int pendingFeatures = installedFeatures & ~reportedFeatures;
+        int pendingFeatures = installedCapabilities & ~reportedCapabilities;
         if (context == null || pendingFeatures == 0) {
             return;
         }
@@ -85,9 +85,9 @@ final class TargetProcessRuntime {
             BroadcastOptions options = BroadcastOptions.makeBasic();
             options.setShareIdentityEnabled(true);
             context.sendBroadcast(report, null, options.toBundle());
-            reportedFeatures |= pendingFeatures;
+            reportedCapabilities |= pendingFeatures;
             module.log(Log.INFO, TAG,
-                    "Reported Hook features=" + pendingFeatures + " from " + sourceProcess);
+                    "Reported Hook capabilities=" + pendingFeatures + " from " + sourceProcess);
         } catch (Throwable error) {
             module.log(Log.WARN, TAG, "Could not report installed Hook features", error);
         }

@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.6.0] - 2026-08-13
+
+### Fixed
+
+- Restored fresh phone discovery after MiLink data is cleared by installing the
+  `LyraDiscover` compatibility hooks in their actual owner process,
+  `com.milink.service:ui`.
+
+### Changed
+
+- Split device discovery and notification-click circulation into independent,
+  exact-process Hook groups.
+- Cross-device notification status is reported as applied only after both process components have
+  installed successfully.
+
 ## [1.5.0] - 2026-08-12
 
 ### Added
@@ -28,4 +43,5 @@ All notable changes to this project are documented in this file.
 - Unit tests cover settings, status policy, feature masks, notification transaction lifetime, orientation policy, and Host-binding/channel policy.
 - `testDebugUnitTest`, `lintDebug`, `assembleDebug`, and `git diff --check` pass before the initial public publication.
 
+[1.6.0]: https://github.com/silverpoetry/HyperConnectToolkit/releases/tag/v1.6.0
 [1.5.0]: https://github.com/silverpoetry/HyperConnectToolkit/releases/tag/v1.5.0
