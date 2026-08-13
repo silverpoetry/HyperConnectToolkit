@@ -5,9 +5,11 @@ import com.weichao.hyperconnecttoolkit.BuildConfig
 object HookStatusPolicy {
     const val EXPECTED_MODULE_VERSION = BuildConfig.VERSION_CODE
 
-    private val allowedFeaturesByTarget = mapOf(
+    private val allowedCapabilitiesByTarget = mapOf(
+        HookTarget("com.milink.service", "com.milink.service:ui") to
+            HookStatusContract.COMPONENT_NOTIFICATION_DISCOVERY,
         HookTarget("com.milink.service", "com.milink.crossdeviceservice") to
-            HookStatusContract.FEATURE_CROSS_DEVICE_NOTIFICATION,
+            HookStatusContract.COMPONENT_NOTIFICATION_FLOW,
         HookTarget("com.milink.service", "com.milink.service:core") to
             HookStatusContract.FEATURE_MILINK_MULTI_CHANNEL,
         HookTarget("com.xiaomi.mirror", "com.xiaomi.mirror") to
@@ -29,9 +31,9 @@ object HookStatusPolicy {
         if (sourcePackage !in senderPackages) return null
 
         val target = HookTarget(sourcePackage, sourceProcess)
-        val allowedMask = allowedFeaturesByTarget[target] ?: return null
+        val allowedMask = allowedCapabilitiesByTarget[target] ?: return null
         if (reportedFeatureMask == 0) return null
-        if (reportedFeatureMask and HookStatusContract.ALL_FEATURES != reportedFeatureMask) {
+        if (reportedFeatureMask and HookStatusContract.ALL_REPORT_BITS != reportedFeatureMask) {
             return null
         }
         if (reportedFeatureMask and allowedMask != reportedFeatureMask) return null

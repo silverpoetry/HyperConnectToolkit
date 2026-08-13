@@ -44,7 +44,11 @@ public final class HyperConnectModule extends XposedModule {
         recordDiagnosticBootstrap(target, features, diagnostics);
 
         switch (target) {
-            case MILINK_NOTIFICATION -> installNotificationFeature(
+            case MILINK_NOTIFICATION_DISCOVERY -> installNotificationDiscoveryFeature(
+                    param.getDefaultClassLoader(),
+                    features,
+                    diagnostics);
+            case MILINK_NOTIFICATION_FLOW -> installNotificationFlowFeature(
                     param.getDefaultClassLoader(),
                     features,
                     diagnostics);
@@ -72,16 +76,17 @@ public final class HyperConnectModule extends XposedModule {
         if (portraitHooks.installOrientation(param.getClassLoader())
                 && portraitHooks.isComplete()
                 && mirrorReporterInstalled) {
-            mirrorRuntime.recordInstalledFeature(HookStatusContract.FEATURE_PORTRAIT_STREAMING);
+            mirrorRuntime.recordInstalledCapability(
+                    HookStatusContract.FEATURE_PORTRAIT_STREAMING);
         }
     }
 
-    private void installNotificationFeature(
+    private void installNotificationDiscoveryFeature(
             ClassLoader classLoader,
             HookFeatureFlags features,
             DiagnosticLogger diagnostics) {
         boolean tablet = isTablet(classLoader, diagnostics);
-        MiLinkNotificationHooks hooks = new MiLinkNotificationHooks(this, diagnostics);
+        MiLinkDiscoveryHooks hooks = new MiLinkDiscoveryHooks(this, diagnostics);
         boolean installed = false;
         if (features.crossDeviceNotification && tablet) {
             installed = hooks.install(classLoader);
@@ -90,13 +95,33 @@ public final class HyperConnectModule extends XposedModule {
         }
 
         if (features.detailedLogging) {
-            hooks.installDiagnostics(classLoader, installed);
+            new NotificationDiscoveryDiagnostics(this, diagnostics).install(
+                    classLoader,
+                    installed);
         }
         startRuntime(
                 installed,
                 diagnostics,
-                TargetProcess.MILINK_NOTIFICATION,
-                HookStatusContract.FEATURE_CROSS_DEVICE_NOTIFICATION);
+                TargetProcess.MILINK_NOTIFICATION_DISCOVERY,
+                HookStatusContract.COMPONENT_NOTIFICATION_DISCOVERY);
+    }
+
+    private void installNotificationFlowFeature(
+            ClassLoader classLoader,
+            HookFeatureFlags features,
+            DiagnosticLogger diagnostics) {
+        boolean tablet = isTablet(classLoader, diagnostics);
+        boolean installed = features.crossDeviceNotification
+                && tablet
+                && new MiLinkNotificationFlowHooks(this, diagnostics).install(classLoader);
+        if (features.crossDeviceNotification && !tablet) {
+            log(Log.INFO, TAG, "Skipped tablet notification compatibility on a phone");
+        }
+        startRuntime(
+                installed,
+                diagnostics,
+                TargetProcess.MILINK_NOTIFICATION_FLOW,
+                HookStatusContract.COMPONENT_NOTIFICATION_FLOW);
     }
 
     private void installMultiChannelFeature(
@@ -143,7 +168,7 @@ public final class HyperConnectModule extends XposedModule {
             boolean installed,
             DiagnosticLogger diagnostics,
             TargetProcess target,
-            int feature) {
+            int capability) {
         if (!installed && !diagnostics.isEnabled()) return;
         TargetProcessRuntime runtime = new TargetProcessRuntime(
                 this,
@@ -151,7 +176,7 @@ public final class HyperConnectModule extends XposedModule {
                 target.packageName,
                 target.processName);
         if (runtime.installLifecycleHook() && installed) {
-            runtime.recordInstalledFeature(feature);
+            runtime.recordInstalledCapability(capability);
         }
     }
 

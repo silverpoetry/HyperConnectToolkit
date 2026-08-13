@@ -16,6 +16,13 @@ public final class HookStatusContract {
             | FEATURE_PORTRAIT_STREAMING
             | FEATURE_MILINK_MULTI_CHANNEL;
 
+    /** Internal evidence bits used when one user feature spans independently injected processes. */
+    public static final int COMPONENT_NOTIFICATION_DISCOVERY = 1 << 8;
+    public static final int COMPONENT_NOTIFICATION_FLOW = 1 << 9;
+    public static final int ALL_REPORT_BITS = ALL_FEATURES
+            | COMPONENT_NOTIFICATION_DISCOVERY
+            | COMPONENT_NOTIFICATION_FLOW;
+
     private HookStatusContract() {
     }
 }

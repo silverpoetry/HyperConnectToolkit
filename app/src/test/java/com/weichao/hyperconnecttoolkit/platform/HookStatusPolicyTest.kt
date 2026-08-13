@@ -78,4 +78,38 @@ class HookStatusPolicyTest {
             ),
         )
     }
+
+    @Test
+    fun `accepts only the notification component owned by each process`() {
+        val sender = listOf("com.milink.service")
+        assertEquals(
+            HookStatusContract.COMPONENT_NOTIFICATION_DISCOVERY,
+            HookStatusPolicy.validate(
+                sender,
+                "com.milink.service",
+                "com.milink.service:ui",
+                HookStatusPolicy.EXPECTED_MODULE_VERSION,
+                HookStatusContract.COMPONENT_NOTIFICATION_DISCOVERY,
+            )?.featureMask,
+        )
+        assertEquals(
+            HookStatusContract.COMPONENT_NOTIFICATION_FLOW,
+            HookStatusPolicy.validate(
+                sender,
+                "com.milink.service",
+                "com.milink.crossdeviceservice",
+                HookStatusPolicy.EXPECTED_MODULE_VERSION,
+                HookStatusContract.COMPONENT_NOTIFICATION_FLOW,
+            )?.featureMask,
+        )
+        assertNull(
+            HookStatusPolicy.validate(
+                sender,
+                "com.milink.service",
+                "com.milink.service:ui",
+                HookStatusPolicy.EXPECTED_MODULE_VERSION,
+                HookStatusContract.COMPONENT_NOTIFICATION_FLOW,
+            ),
+        )
+    }
 }

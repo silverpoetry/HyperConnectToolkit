@@ -46,17 +46,20 @@ object HookRuntimeStore {
         }
     }
 
-    fun recordAppliedFeatures(context: Context, featureMask: Int) {
+    fun recordReportedCapabilities(context: Context, capabilityMask: Int) {
         initialize(context)
-        val sanitizedMask = featureMask and HookStatusContract.ALL_FEATURES
+        val sanitizedMask = capabilityMask and HookStatusContract.ALL_REPORT_BITS
         if (sanitizedMask == 0 || bootCount == INVALID_BOOT_COUNT) return
 
         synchronized(lock) {
-            val previousMask = readLocked().appliedFeatureMask
+            val previousMask = readReportedMaskLocked()
             preferences.edit(commit = true) {
                 putInt(KEY_VERSION_CODE, BuildConfig.VERSION_CODE)
                 putInt(KEY_BOOT_COUNT, bootCount)
-                putInt(KEY_APPLIED_FEATURES, previousMask or sanitizedMask)
+                putInt(
+                    KEY_REPORTED_CAPABILITIES,
+                    mergeReportedCapabilities(previousMask, sanitizedMask),
+                )
                 putLong(KEY_REPORTED_AT, System.currentTimeMillis())
             }
             mutableState.value = readLocked()
@@ -79,28 +82,36 @@ object HookRuntimeStore {
     }
 
     private fun readLocked(): HookRuntimeState {
+        return HookRuntimeState.fromMask(readReportedMaskLocked())
+    }
+
+    private fun readReportedMaskLocked(): Int {
         if (!::preferences.isInitialized || bootCount == INVALID_BOOT_COUNT) {
-            return HookRuntimeState()
+            return 0
         }
         if (
             preferences.getInt(KEY_VERSION_CODE, 0) != BuildConfig.VERSION_CODE ||
             preferences.getInt(KEY_BOOT_COUNT, INVALID_BOOT_COUNT) != bootCount
         ) {
-            return HookRuntimeState()
+            return 0
         }
-        return HookRuntimeState.fromMask(preferences.getInt(KEY_APPLIED_FEATURES, 0))
+        return preferences.getInt(KEY_REPORTED_CAPABILITIES, 0) and
+            HookStatusContract.ALL_REPORT_BITS
     }
 
     private const val PREFERENCES_NAME = "hook_runtime_status"
     private const val KEY_VERSION_CODE = "version_code"
     private const val KEY_BOOT_COUNT = "boot_count"
-    private const val KEY_APPLIED_FEATURES = "applied_features"
+    private const val KEY_REPORTED_CAPABILITIES = "reported_capabilities"
     private const val KEY_REPORTED_AT = "reported_at"
     private const val INVALID_BOOT_COUNT = -1
 
     private val STATUS_KEYS = setOf(
         KEY_VERSION_CODE,
         KEY_BOOT_COUNT,
-        KEY_APPLIED_FEATURES,
+        KEY_REPORTED_CAPABILITIES,
     )
+
+    internal fun mergeReportedCapabilities(previous: Int, incoming: Int): Int =
+        (previous or incoming) and HookStatusContract.ALL_REPORT_BITS
 }

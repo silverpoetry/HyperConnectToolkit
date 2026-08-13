@@ -9,9 +9,20 @@ data class HookRuntimeState(
     fun isApplied(feature: Feature): Boolean = appliedFeatureMask and feature.mask != 0
 
     companion object {
-        fun fromMask(mask: Int): HookRuntimeState = HookRuntimeState(
-            appliedFeatureMask = mask and HookStatusContract.ALL_FEATURES,
-        )
+        fun fromMask(mask: Int): HookRuntimeState {
+            val reported = mask and HookStatusContract.ALL_REPORT_BITS
+            var applied = reported and (
+                HookStatusContract.FEATURE_PORTRAIT_STREAMING or
+                    HookStatusContract.FEATURE_MILINK_MULTI_CHANNEL
+                )
+            val notificationComponents =
+                HookStatusContract.COMPONENT_NOTIFICATION_DISCOVERY or
+                    HookStatusContract.COMPONENT_NOTIFICATION_FLOW
+            if (reported and notificationComponents == notificationComponents) {
+                applied = applied or HookStatusContract.FEATURE_CROSS_DEVICE_NOTIFICATION
+            }
+            return HookRuntimeState(appliedFeatureMask = applied)
+        }
     }
 }
 

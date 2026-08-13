@@ -23,8 +23,8 @@ android {
         applicationId = "com.weichao.hyperconnecttoolkit"
         minSdk = 34
         targetSdk = 36
-        versionCode = 12
-        versionName = "1.6.0-diagnostic.1"
+        versionCode = 13
+        versionName = "1.6.0-diagnostic.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
