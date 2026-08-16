@@ -1,1 +1,1 @@
--keep class com.weichao.hyperconnecttoolkit.xposed.HyperConnectModule { *; }
+-keep class com.weichao.hyperconnecttoolkit.** { *; }

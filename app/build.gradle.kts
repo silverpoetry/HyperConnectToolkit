@@ -42,13 +42,13 @@ android {
 
     buildTypes {
         release {
-            // LSPosed loads the module entry by its exact resource-listed class name. Keeping the
-            // compatibility layer unobfuscated also makes ROM-update failures diagnosable.
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            signingConfig = signingConfigs.getByName("debug")
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
